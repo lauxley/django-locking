@@ -62,6 +62,7 @@ locking.admin = function() {
     // outside the onready call.
     try {
         settings = locking.settings;
+        need_unlock = true;
 
         var change_form = $('#' + locking.infos.change_form_id);
 
@@ -111,7 +112,7 @@ locking.admin = function() {
             $('#locking_ok').text(text.editing);
             // Empty and hide notification area
             $("#content-main #locking_notification").hide().html('');
-        }
+        };
 
         // Creates empty div in top of page.
         var create_notification_area = function() {
@@ -150,7 +151,7 @@ locking.admin = function() {
                 if (confirm(text.prompt_to_save)) {
                     $('input[type=submit][name=_continue]', change_form).click();
                 }
-            }
+            };
             var minutes = Math.round((settings.time_until_expiration -
                 settings.time_until_warning) / 60);
             if (minutes < 1) minutes = 1;
@@ -195,16 +196,21 @@ locking.admin = function() {
             // We have to assure that our unlock request actually gets
             // through before the user leaves the page, so it shouldn't
             // run asynchronously.
-            $.ajax({
-                url: urls.unlock,
-                async: false,
-                cache: false
-            });
+            if (need_unlock) {
+               $.ajax({
+                 url: urls.unlock,
+                 async: false,
+                 cache: false
+               });
+            }
         };
 
         var remove_ajax_unload = function() {
-            $(window).unbind('beforeunload', request_unlock);
-        }
+            // we need a global variable to be safer, 
+            // because sometimes the event 'unload' is triggered before it is unbound
+            need_unlock = false;
+            $(window).unbind('unload', request_unlock);
+        };
 
         var initialize_edit_mode = function() {
                 notify_edit_mode();
@@ -215,11 +221,11 @@ locking.admin = function() {
                     [expire_page, settings.time_until_expiration]
                 ]);
                 // Unlock page when user leaves the page without saving
-                $(window).bind('beforeunload', request_unlock);
+                $(window).bind('unload', request_unlock );
                 // If user is saving, don't ask for unlocking, it will
                 // be done python-ly
-                change_form.bind('submit', remove_ajax_unload)
-        }
+                change_form.bind('submit', remove_ajax_unload);
+        };
 
         var request_refresh_lock = function(force_save) {
             var parse_refresh_lock_response = function(data, textStatus, jqXHR) {
